@@ -307,7 +307,6 @@ async def block_user(callback_query: types.CallbackQuery):
 
 @dp.message(block_filter(), Command("profile"))
 @catch_errors
-@dp.message(block_filter(), Command("profile"))
 async def profile(message: Message):
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
