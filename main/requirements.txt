@@ -1,0 +1,5 @@
+
+aiogram==3.21.0
+GitPython==3.1.45
+profanityfilter==2.1.0
+-e git+https://github.com/bromander/SPPSMRHP.git@46771d79078fcfbae8add22c16e31aba95269376#egg=yandex_music
