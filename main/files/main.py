@@ -63,7 +63,7 @@ async def send_info(message: Message):
     message_before_ping = await message.answer(f'Альфредо 19 \n'
                          f'Версия: V1.{vers}\n'
                          f'---------------------\n'
-                         f'Последнее обновление: {last_comit_data.committed_datetime}\n{last_comit_data.message.strip()}\n\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {last_comit_data.message.strip()}\n\n'
                          f"Пинг: Загрузка...")
     end_time = time.perf_counter()
     latency = (end_time - start_time) * 1000
@@ -71,7 +71,7 @@ async def send_info(message: Message):
     await message_before_ping.edit_text(f'Альфредо 19 \n'
                          f'Версия: V1.{vers}\n'
                          f'---------------------\n'
-                         f'Последнее обновление: {last_comit_data.committed_datetime}\n{last_comit_data.message.strip()}\n\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {last_comit_data.message.strip()}\n\n'
                          f"Пинг: {latency:.2f} мс")
 
 
