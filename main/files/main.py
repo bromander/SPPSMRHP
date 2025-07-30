@@ -48,19 +48,31 @@ def block_filter():
     return _filter
 
 
-#WIP
-@dp.message(Command("info"))
-async def send_info(message: Message):
-    tmp = tempfile.mkdtemp()
-    try:
-        # клонируем bare‑репозиторий
-        repo = Repo.clone_from("", tmp, bare=True)
-        # Repo.iter_commits('--all') пробежит по всем веткам
-        return sum(1 for _ in repo.iter_commits("--all"))
-    finally:
-        shutil.rmtree(tmp)
 
-    await message.answer(f'Альфредо 19 V')
+@dp.message(Command("bot_info"))
+async def send_info(message: Message):
+    def count_commits_gitpython(repo_path: str) -> int:
+        repo = Repo(repo_path)
+        commits = list(repo.iter_commits('master'))
+        last_commit = repo.head.commit
+        return len(commits), last_commit
+
+    vers, last_comit_data = count_commits_gitpython(r"C:\Users\roma\PycharmProjects\SPPSMRHP")
+
+    start_time = time.perf_counter()
+    message_before_ping = await message.answer(f'Альфредо 19 \n'
+                         f'Версия: V1.{vers}\n'
+                         f'---------------------\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n{last_comit_data.message.strip()}\n\n'
+                         f"Пинг: Загрузка...")
+    end_time = time.perf_counter()
+    latency = (end_time - start_time) * 1000
+
+    await message_before_ping.edit_text(f'Альфредо 19 \n'
+                         f'Версия: V1.{vers}\n'
+                         f'---------------------\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n{last_comit_data.message.strip()}\n\n'
+                         f"Пинг: {latency:.2f} мс")
 
 
 
@@ -110,7 +122,7 @@ async def set_class_(callback_query: types.CallbackQuery):
     wwjson.send_json_data(human_souls_data, "jsons/Human_souls.json")
 
     await callback_query.answer()
-    await callback_query.message.answer("Команды бота:\n\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков")
+    await callback_query.message.answer("Команды бота:\n\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте")
 
 
 class Waiting(StatesGroup):
