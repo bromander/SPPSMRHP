@@ -1,23 +1,21 @@
-import os
 import asyncio
 import logging
+import traceback
 import sys
-import random
-
-from pyexpat.errors import messages
 from yandex_music import ClientAsync
 import time
-from aiogram import Bot, Dispatcher, types, BaseMiddleware
+from aiogram import Bot, Dispatcher, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message, TelegramObject
+from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from skripts import additionals
 from skripts.additionals import Work_with_json as wwjson, Yandex_music_parse as Yparse
 from aiogram.fsm.context import FSMContext
 from git import Repo
-import tempfile, shutil
+import functools
+import coloredlogs
 
 PENDING_REQUESTS = {}
 TOKEN = "7559789537:AAHvjxbEEmQ46w4ACdDoeJ2tQSlp3lZsolk"
@@ -25,7 +23,9 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
 
-admins_ids = [5389197909, 6113046557]
+admins_ids = [
+    5389197909
+]
 
 
 def block_filter():
@@ -48,8 +48,37 @@ def block_filter():
     return _filter
 
 
+def catch_errors(func):
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+
+            logging.error(e)
+
+            tb = sys.exc_info()[2]
+            last_trace = traceback.extract_tb(tb)[-1]
+
+            code = f'''
+            {type(e).__name__} on line {last_trace.lineno}: {e}
+            '''
+            escaped = code.replace("_", "\\_").replace("*", "\\*") \
+                .replace("[", "\\[").replace("`", "\\`")
+
+            text = f"```python\n{escaped}```"
+            await args[0].answer((f"❗ Упс! Произошла неизвестная ошибка.\n"
+                                  f"Попробуйте выполнить команду /start или проверьте своё интернет‑соединение.\n"
+                                  f"Если это не поможет, обратитесь в техническую поддержку: @br0mand\n\n"
+                                  f"⚙️ Код ошибки:"))
+            await args[0].answer(text, parse_mode="MarkdownV2")
+
+
+    return wrapper
+
 
 @dp.message(Command("bot_info"))
+@catch_errors
 async def send_info(message: Message):
     def count_commits_gitpython(repo_path: str) -> int:
         repo = Repo(repo_path)
@@ -57,13 +86,14 @@ async def send_info(message: Message):
         last_commit = repo.head.commit
         return len(commits), last_commit
 
-    vers, last_comit_data = count_commits_gitpython(r"C:\Users\roma\PycharmProjects\SPPSMRHP")
+    vers, last_comit_data = count_commits_gitpython(r"../../")
 
     start_time = time.perf_counter()
+    commit_data = '• '.join(str(last_comit_data.message.strip()).split("."))
     message_before_ping = await message.answer(f'Альфредо 19 \n'
                          f'Версия: V1.{vers}\n'
                          f'---------------------\n'
-                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {last_comit_data.message.strip()}\n\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {commit_data}\n\n'
                          f"Пинг: Загрузка...")
     end_time = time.perf_counter()
     latency = (end_time - start_time) * 1000
@@ -71,13 +101,13 @@ async def send_info(message: Message):
     await message_before_ping.edit_text(f'Альфредо 19 \n'
                          f'Версия: V1.{vers}\n'
                          f'---------------------\n'
-                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {last_comit_data.message.strip()}\n\n'
+                         f'Последнее обновление: {last_comit_data.committed_datetime}\n• {commit_data}\n\n'
                          f"Пинг: {latency:.2f} мс")
 
 
 
 #Комманда Start
-@dp.message(Command("start"))
+@dp.message(block_filter(), Command("start"))
 async def start_command(message: Message):
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
@@ -130,6 +160,7 @@ class Waiting(StatesGroup):
 
 
 @dp.message(block_filter(), Command("music"))
+@catch_errors
 async def music(message: Message, state: FSMContext):
     userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
@@ -139,21 +170,30 @@ async def music(message: Message, state: FSMContext):
         userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
         wwjson.send_json_data(userdata, "jsons/Human_souls.json")
 
+
     else:
-        await message.answer(f"Вы делаете слишком частые запросы!\nПожалуйста, подождите {30 - int(time.time() - int(userdata[str(message.from_user.id)]["last_mus"]))} сек")
+        sec = int(userdata[str(message.from_user.id)]["last_mus"])
+        await message.answer(f"Вы делаете слишком частые запросы!\nПожалуйста, подождите {30 - int(time.time()) - sec} сек")
+
 
 @dp.message(Waiting.waiting_for_music)
+@catch_errors
 async def waiting_for_music(message: Message, state: FSMContext):
+    userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
     states_pon = []
     musics = message.text.split(",")
+    if len(musics) >= 50:
+        await message.answer(f"❗ Ошибка, вы предложили слишком много музыки!\n({len(musics)}/50)")
+        return None
 
     query = '\n'.join(states_pon)
     message_query = await message.answer(f"Загрузка...\n<blockquote expandable>{query}</blockquote>")
 
-    human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
-
     for i in musics:
+        userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
+        wwjson.send_json_data(userdata, "jsons/Human_souls.json")
         track_swearing = await yparse.check_text_for_swearing(str(i))
+        i = str(i).replace("\n", '')
         if track_swearing == False:
             try:
                 track = await yparse.parse(i)
@@ -214,6 +254,7 @@ async def waiting_for_music(message: Message, state: FSMContext):
 
 async def send_request_to_admins(soul_name, track, soul_id, soul_request):
     global PENDING_REQUESTS
+    soul_request = soul_request.replace("\n", '')
 
     artists = ', '.join([i['name'] for i in track['artists']][:2])
     PENDING_REQUESTS[len(PENDING_REQUESTS)] = f"{track['title']}-({artists})"
@@ -265,6 +306,8 @@ async def block_user(callback_query: types.CallbackQuery):
 
 
 @dp.message(block_filter(), Command("profile"))
+@catch_errors
+@dp.message(block_filter(), Command("profile"))
 async def profile(message: Message):
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
@@ -280,14 +323,17 @@ async def profile(message: Message):
 
     all_user_tracks = "\n\n".join(all_user_tracks)
 
+    user_class = human_souls[str(message.from_user.id)]["class"]
+    tracks_len = len(list(human_souls[str(message.from_user.id)]["suggested_music"].keys()))
     await message.answer(
         f"Профиль @{message.from_user.username}"
-        f"\nКласс: {human_souls[str(message.from_user.id)]["class"]}"
-        f"\nКол-во предложенных треков: {len(list(human_souls[str(message.from_user.id)]["suggested_music"].keys()))}"
+        f"\nКласс: {user_class}"
+        f"\nКол-во предложенных треков: {tracks_len}"
         f"<blockquote expandable>{all_user_tracks}</blockquote>"
     )
 
 @dp.message(block_filter(), Command("top"))
+@catch_errors
 async def top(message: Message):
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
@@ -296,20 +342,24 @@ async def top(message: Message):
     )
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = \
-        [f"{f"{"-".join(i.split("-")[:-1])} / <i>{"-".join(i.split("-")[-1:]).replace(")", "").replace("(", "")}</i>"} : {TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon[i]}"
-         for i in TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon]
+        [
+            f"{'-'.join(i.split('-')[:-1])} / <i>{'-'.join(i.split('-')[-1:]).replace(')', '').replace('(', '')}</i> : {TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon[i]}"
+            for i in
+            TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon
+        ]
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = ''.join(
         (f"🔴 {el}" if i == 0 else
-         f"\n 🟠 {el}" if i == 1 else
-         f"\n  🟡 {el}" if i == 2 else
-         f"\n  🔵 {el}")
+        f"\n 🟠 {el}" if i == 1 else
+        f"\n  🟡 {el}" if i == 2 else
+        f"\n  🔵 {el}")
         for i, el in enumerate(
             TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon)
     )
 
+    top_tracks = human_souls[str(message.from_user.id)]["class"]
     await message.answer(
-        f"👑 Топ 20 треков {human_souls[str(message.from_user.id)]["class"]} классов:"
+        f"👑 Топ 20 треков {top_tracks} классов:"
         f"\n\n{TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon}"
     )
 
@@ -328,5 +378,7 @@ async def main():
 
 #запуск
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    coloredlogs.DEFAULT_FIELD_STYLES = {'asctime': {'color': 'green'}, 'levelname': {'color': 'green'}, 'name': {'color': 'blue'}}
+    coloredlogs.DEFAULT_LEVEL_STYLES = {'critical': {'bold': True, 'color': 'red'}, 'debug': {'color': 'white'}, 'error': {'color': 'red'}, 'info': {'color': 'white'}, 'notice': {'color': 'magenta'}, 'spam': {'color': 'green', 'faint': True}, 'success': {'bold': True, 'color': 'green'}, 'verbose': {'color': 'blue'}, 'warning': {'color': 'yellow'}}
+    coloredlogs.install(level=logging.INFO, stream=sys.stdout, format='%(asctime)s : %(levelname)s : %(message)s')
     asyncio.run(main())
