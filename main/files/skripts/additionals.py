@@ -28,6 +28,7 @@ class Work_with_json:
                     return human_souls[i]["suggested_music"][track_name]
         return "TrackNotFoundError"
 
+
     def know_top50_music(self, class_pon):
         top_dict = {}
         human_souls = dict(self.get_json_data("jsons/Human_souls.json"))

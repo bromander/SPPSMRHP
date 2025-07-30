@@ -19,7 +19,7 @@ from aiogram.fsm.context import FSMContext
 from git import Repo
 import tempfile, shutil
 
-
+PENDING_REQUESTS = {}
 TOKEN = "7559789537:AAHvjxbEEmQ46w4ACdDoeJ2tQSlp3lZsolk"
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
@@ -213,11 +213,15 @@ async def waiting_for_music(message: Message, state: FSMContext):
 
 
 async def send_request_to_admins(soul_name, track, soul_id, soul_request):
+    global PENDING_REQUESTS
+
     artists = ', '.join([i['name'] for i in track['artists']][:2])
+    PENDING_REQUESTS[len(PENDING_REQUESTS)] = f"{track['title']}-({artists})"
+
     buttons = [
         [
-            types.InlineKeyboardButton(text="✅", callback_data=f"track_{track['title']}-({artists})_allow"),
-            types.InlineKeyboardButton(text="❌", callback_data=f"track_{track['title']}-({artists})_forbid")
+            types.InlineKeyboardButton(text="✅", callback_data=f"track_{len(PENDING_REQUESTS)}_allow"),
+            types.InlineKeyboardButton(text="❌", callback_data=f"track_{len(PENDING_REQUESTS)}_forbid")
         ],
         [
             types.InlineKeyboardButton(text=f"⛔ Заблокировать @{soul_name}", callback_data=f"block_user_{soul_id}")
@@ -235,13 +239,14 @@ async def track_allow(callback_query: types.CallbackQuery):
     action = callback_query.data.split("_")[2]
 
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
+    print(PENDING_REQUESTS)
 
     if action == "allow":
-        human_souls[str(callback_query.from_user.id)]["suggested_music"][track_title] = True
-        await callback_query.message.answer(f"✅ Трек {track_title} был успешно одобрен!")
+        human_souls[str(callback_query.from_user.id)]["suggested_music"][PENDING_REQUESTS[int(track_title)-1]] = True
+        await callback_query.message.answer(f"✅ Трек {PENDING_REQUESTS[int(track_title)-1]} был успешно одобрен!")
     elif action == "forbid":
-        await callback_query.message.answer(f"✅ Трек {track_title} был отменён!")
-        human_souls[str(callback_query.from_user.id)]["suggested_music"][track_title] = False
+        await callback_query.message.answer(f"✅ Трек {PENDING_REQUESTS[int(track_title)-1]} был отменён!")
+        human_souls[str(callback_query.from_user.id)]["suggested_music"][PENDING_REQUESTS[int(track_title)-1]] = False
 
     wwjson.send_json_data(human_souls, "jsons/Human_souls.json")
 
@@ -296,9 +301,9 @@ async def top(message: Message):
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = ''.join(
         (f"🔴 {el}" if i == 0 else
-         f"\n\n 🟠 {el}" if i == 1 else
-         f"\n\n  🟡 {el}" if i == 2 else
-         f"\n\n  🔵 {el}")
+         f"\n 🟠 {el}" if i == 1 else
+         f"\n  🟡 {el}" if i == 2 else
+         f"\n  🔵 {el}")
         for i, el in enumerate(
             TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon)
     )
