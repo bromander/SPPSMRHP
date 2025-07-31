@@ -59,7 +59,7 @@ class Yandex_music_parse:
     @staticmethod
     async def download_mus(first_short):
         artists = "_".join([i["name"] for i in first_short['artists']][:3])
-        await first_short.download_async(f'D:/yeah/{first_short["title"]}-({artists}).mp3')
+        await first_short.download_async(f'./{first_short["title"]}-({artists}).mp3')
 
 
     async def check_mus_for_swearing(self, first_short):
