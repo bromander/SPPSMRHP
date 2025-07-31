@@ -303,6 +303,9 @@ async def send_request_to_admins(soul_name, track, soul_id, soul_request):
 
 @dp.callback_query(lambda c: c.data.startswith("track_"))
 async def track_allow(callback_query: types.CallbackQuery):
+    global PENDING_REQUESTS
+    global MESSAGE_IDS_ANM_REQUESTS
+
     track_title = callback_query.data.split("_")[1]
     action = callback_query.data.split("_")[2]
 
@@ -326,7 +329,8 @@ async def track_allow(callback_query: types.CallbackQuery):
             except aiogram.exceptions.TelegramBadRequest:
                 pass
 
-
+    MESSAGE_IDS_ANM_REQUESTS.pop(int(track_title))
+    PENDING_REQUESTS.pop(int(track_title)-1)
     await callback_query.answer()
 
 
