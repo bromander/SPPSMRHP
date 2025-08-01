@@ -408,10 +408,32 @@ async def top(message: Message):
 #хз чо это, какаята main залупа чтобы бот запустился
 async def main():
     global yparse
+    connect_stat = True
 
-    client = await ClientAsync(token="y0__xD7ganyBRje-AYgicPntBL0uWtUHnAsJBHTkC-I29OiaSJPeg").init()
+    while True:
+        try:
+            client = await ClientAsync(token="y0__xD7ganyBRje-AYgicPntBL0uWtUHnAsJBHTkC-I29OiaSJPeg").init()
+            yparse = Yparse(client)
 
-    yparse = Yparse(client)
+        except yandex_music.exceptions.TimedOutError:
+            logging.warning("Connection timed out. Waiting for 60 seconds...")
+            connect_stat = False
+            await asyncio.sleep(60)
+
+        except yandex_music.exceptions.NetworkError:
+            logging.warning("Connection connection is missing. Waiting for 60 seconds...")
+            connect_stat = False
+            await asyncio.sleep(60)
+
+        else:
+            if not connect_stat:
+                logging.warning("Connection is established!")
+                connect_stat = True
+                client = await ClientAsync(token="y0__xD7ganyBRje-AYgicPntBL0uWtUHnAsJBHTkC-I29OiaSJPeg").init()
+                yparse = Yparse(client)
+            break
+
+
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
