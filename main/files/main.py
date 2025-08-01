@@ -404,29 +404,10 @@ async def top(message: Message):
         f"\n\n{TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon}"
     )
 
-async def check_connection():
-    connect_stat = True
-    def ping(host):
-        parameter = '-n' if platform.system().lower() == 'windows' else '-c'
-        command = ['ping', parameter, '1', host]
-        return subprocess.run(command, stdout=subprocess.PIPE).returncode == 0
-
-    while True:
-        if not await asyncio.to_thread(ping, "ya.ru"):
-            logging.warning("Connection lost. Waiting for 120 seconds...")
-            connect_stat = False
-            await asyncio.sleep(120)
-        else:
-            if not connect_stat:
-                logging.warning("Connection is established!")
-                connect_stat = True
-
 
 #хз чо это, какаята main залупа чтобы бот запустился
 async def main():
     global yparse
-
-    asyncio.create_task(check_connection())
 
     client = await ClientAsync(token="y0__xD7ganyBRje-AYgicPntBL0uWtUHnAsJBHTkC-I29OiaSJPeg").init()
 
