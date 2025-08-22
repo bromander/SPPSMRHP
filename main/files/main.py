@@ -3,10 +3,9 @@ import logging
 import traceback
 import sys
 import os
+from typing import Optional, Union
 import aiogram.exceptions
 import yandex_music.exceptions
-import platform
-import subprocess
 from yandex_music import ClientAsync
 import time
 from aiogram import Bot, Dispatcher, types
@@ -30,11 +29,15 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 admins_ids = [
-    5389197909
+    5389197909,
+    6785020418
 ]
 
 
-def block_filter():
+def block_filter() -> any:
+    '''
+    хендлер, проверяющий, не заблокирован ли пользователь
+    '''
     async def _filter(message: Message) -> bool:
         try:
             userdata = wwjson.get_json_data("jsons/Human_souls.json")[str(message.from_user.id)]
@@ -54,7 +57,10 @@ def block_filter():
     return _filter
 
 
-def catch_errors(func):
+def catch_errors(func) -> any:
+    '''
+    Хендлер, который в случае, если в коде при взаимодействии с пользователем происходит ошибка, сообщает об этом
+    '''
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         try:
@@ -91,8 +97,12 @@ def catch_errors(func):
 
 @dp.message(Command("bot_info"))
 @catch_errors
-async def send_info(message: Message):
-    def count_commits_gitpython(repo_path: str) -> int:
+async def send_info(message: Message) -> None:
+    """
+    Отправляет пользователю некоторую информацию бота
+    Команда: /bot_info
+    """
+    def count_commits_gitpython(repo_path: str) -> tuple:
         repo = Repo(repo_path)
         commits = list(repo.iter_commits('master'))
         last_commit = repo.head.commit
@@ -101,7 +111,7 @@ async def send_info(message: Message):
     vers, last_comit_data = count_commits_gitpython(r"../../")
 
     start_time = time.perf_counter()
-    commit_data = '\n• '.join(str(last_comit_data.message.strip()).split("."))
+    commit_data = '\n• '.join(str(last_comit_data.message.strip()).split(". "))
     message_before_ping = await message.answer(f'Альфредо 19 \n'
                          f'Версия: V1.{vers}\n'
                          f'---------------------\n'
@@ -120,7 +130,11 @@ async def send_info(message: Message):
 
 #Комманда Start
 @dp.message(block_filter(), Command("start"))
-async def start_command(message: Message):
+async def start_command(message: Message) -> None:
+    '''
+    Команда, вызываемая при первом взаимодействии пользователя с ботом.
+    Сохраняет его в базу данных и требует некоторую информацию
+    '''
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     if str(message.from_user.id) not in list(human_souls_data.keys()):
@@ -155,7 +169,10 @@ async def start_command(message: Message):
 
 
 @dp.callback_query(lambda c: c.data.startswith("set_class_"))
-async def set_class_(callback_query: types.CallbackQuery):
+async def set_class_(callback_query: types.CallbackQuery) -> None:
+    '''
+    Устанавливает класс в котором учится пользователь
+    '''
 
     class_pon = str(callback_query.data).split("_")[2]
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
@@ -173,7 +190,11 @@ class Waiting(StatesGroup):
 
 @dp.message(block_filter(), Command("music"))
 @catch_errors
-async def music(message: Message, state: FSMContext):
+async def music(message: Message, state: FSMContext) -> None:
+    '''
+    Запрашивает у пользователя музыку
+    Команда: /music
+    '''
     userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     if time.time() - int(userdata[str(message.from_user.id)]["last_mus"]) > 30:
@@ -190,8 +211,11 @@ async def music(message: Message, state: FSMContext):
 
 @dp.message(Waiting.waiting_for_music)
 @catch_errors
-async def waiting_for_music(message: Message, state: FSMContext):
-    userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
+async def waiting_for_music(message: Message, state: FSMContext) -> None:
+    '''
+    Получает список музыки от пользователя, парсит его и проверяет текст на неприличные выражения.
+    В случае, если текст трека не был найден, то отправляет сообщение администраторам, чтобы те его проверили и разрешили/отклонили
+    '''
     states_pon = []
     musics = message.text.split(",")
     if len(musics) >= 50:
@@ -202,8 +226,6 @@ async def waiting_for_music(message: Message, state: FSMContext):
     message_query = await message.answer(f"Загрузка...\n<blockquote expandable>{query}</blockquote>")
 
     for i in musics:
-        userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
-        wwjson.send_json_data(userdata, "jsons/Human_souls.json")
         track_swearing = await yparse.check_text_for_swearing(str(i))
         i = str(i).replace("\n", '')
         if track_swearing == False:
@@ -225,24 +247,24 @@ async def waiting_for_music(message: Message, state: FSMContext):
                         track_form = wwjson().already_have_that_track(f"{track['title']}-({artists})")
 
                         if track_form == "TrackNotFoundError":
-                            states_pon.append(f"❔ Текст трека \"{i}\" (Распознанного как \"{track['title']}-({artists})\") не был найден!\n")
+                            states_pon.append(f"❔ Текст трека \"{i}\" (Распознанный как \"{track['title']}-({artists})\") не был найден!\n")
                             additionals.suggest_music(None, message.from_user.id, f"{track['title']}-({artists})")
                             asyncio.create_task(send_request_to_admins(message.from_user.username, track, message.from_user.id, i))
 
                         elif track_form == False:
-                            states_pon.append(f"❌ В треке \"{i}\" (Распознанного как \"{track['title']}-({artists})\") была найдена ненормативная лексика!\n")
+                            states_pon.append(f"❌ В треке \"{i}\" (Распознанный как \"{track['title']}-({artists})\") была найдена ненормативная лексика!\n")
                             additionals.suggest_music(False, message.from_user.id, f"{track['title']}-({artists})")
 
                         elif track_form == True:
-                            states_pon.append(f"✅ Трек \"{i}\" (Распознанного как \"{track['title']}-({artists})\") добавлен в список возможной музыки!\n")
+                            states_pon.append(f"✅ Трек \"{i}\" (Распознанный как \"{track['title']}-({artists})\") добавлен в список возможной музыки!\n")
                             additionals.suggest_music(True, message.from_user.id, f"{track['title']}-({artists})")
 
 
                     elif track_swearing:
-                        states_pon.append(f"❌ В треке \"{i}\" (Распознанного как \"{track['title']}-({artists})\") была найдена ненормативная лексика!\n")
+                        states_pon.append(f"❌ В треке \"{i}\" (Распознанный как \"{track['title']}-({artists})\") была найдена ненормативная лексика!\n")
                         additionals.suggest_music(False, message.from_user.id, f"{track['title']}-({artists})")
                     else:
-                        states_pon.append(f"✅ Трек \"{i}\" (Распознанного как \"{track['title']}-({artists})\") добавлен в список возможной музыки!\n")
+                        states_pon.append(f"✅ Трек \"{i}\" (Распознанный как \"{track['title']}-({artists})\") добавлен в список возможной музыки!\n")
                         additionals.suggest_music(True, message.from_user.id, f"{track['title']}-({artists})")
 
 
@@ -260,11 +282,21 @@ async def waiting_for_music(message: Message, state: FSMContext):
                                   f"\n🔹Если текст трека не был найден, наш администратор проверит ваш трек в течении 48 часов."
                                   f"\n🔹Состояние ваших треков можно увидеть в команде /profile"
                                   f"\n🔹Если трек не был найден вообще, попробуйте указать автора или удостоверьтесь в правильности запроса")
-
+    userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
+    userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
+    wwjson.send_json_data(userdata, "jsons/Human_souls.json")
     await state.clear()
 
 
-async def send_request_to_admins(soul_name, track, soul_id, soul_request):
+async def send_request_to_admins(soul_name: str, track: yandex_music.track.track.Track, soul_id: int, soul_request: str) -> None:
+    print(type(track))
+    '''
+    в случае, если текст трека не был найден, то отправляет администраторам запрос, разрешить/запретить трек или вообще заблокировать пользователя
+    :param soul_name: Юзернейм пользователя
+    :param track: Информация трека
+    :param soul_id: Айди пользователя
+    :param soul_request: То, что ввёл пользователь, чтобы найти трек
+    '''
     global PENDING_REQUESTS
     soul_request = soul_request.replace("\n", '')
 
@@ -304,7 +336,10 @@ async def send_request_to_admins(soul_name, track, soul_id, soul_request):
 
 
 @dp.callback_query(lambda c: c.data.startswith("track_"))
-async def track_allow(callback_query: types.CallbackQuery):
+async def track_allow(callback_query: types.CallbackQuery) -> None:
+    '''
+    Обрабатывает разрешение/запрет трека от администрации
+    '''
     global PENDING_REQUESTS
     global MESSAGE_IDS_ANM_REQUESTS
 
@@ -337,8 +372,10 @@ async def track_allow(callback_query: types.CallbackQuery):
 
 
 @dp.callback_query(lambda c: c.data.startswith("block_user_"))
-async def block_user(callback_query: types.CallbackQuery):
-
+async def block_user(callback_query: types.CallbackQuery) -> None:
+    '''
+    Блокирует пользователя
+    '''
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
     human_souls[str(callback_query.from_user.id)]["blocked"] = True
     wwjson.send_json_data(human_souls, "jsons/Human_souls.json")
@@ -349,7 +386,11 @@ async def block_user(callback_query: types.CallbackQuery):
 
 @dp.message(block_filter(), Command("profile"))
 @catch_errors
-async def profile(message: Message):
+async def profile(message: Message) -> None:
+    '''
+    Выводит данные человека самому себе
+    Команда: /profile
+    '''
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     all_user_tracks = []
@@ -375,11 +416,14 @@ async def profile(message: Message):
 
 @dp.message(block_filter(), Command("top"))
 @catch_errors
-async def top(message: Message):
+async def top(message: Message) -> None:
+    '''
+    Выводит топ треков
+    '''
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = (
-        wwjson().know_top50_music(human_souls[str(message.from_user.id)]["class"])
+        wwjson().know_top20_music(human_souls[str(message.from_user.id)]["class"])
     )
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = \
@@ -397,6 +441,8 @@ async def top(message: Message):
         for i, el in enumerate(
             TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon)
     )
+    if TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon == "":
+        TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = "Треки не были найдены!"
 
     top_tracks = human_souls[str(message.from_user.id)]["class"]
     await message.answer(
@@ -406,7 +452,7 @@ async def top(message: Message):
 
 
 #хз чо это, какаята main залупа чтобы бот запустился
-async def main():
+async def main() -> None:
     global yparse
     connect_stat = True
 
@@ -439,7 +485,7 @@ async def main():
     await dp.start_polling(bot)
 
 
-#запуск
+# запуск
 if __name__ == "__main__":
     coloredlogs.DEFAULT_FIELD_STYLES = {'asctime': {'color': 'green'}, 'levelname': {'color': 'green'}, 'name': {'color': 'blue'}}
     coloredlogs.DEFAULT_LEVEL_STYLES = {'critical': {'bold': True, 'color': 'red'}, 'debug': {'color': 'white'}, 'error': {'color': 'red'}, 'info': {'color': 'white'}, 'notice': {'color': 'magenta'}, 'spam': {'color': 'green', 'faint': True}, 'success': {'bold': True, 'color': 'green'}, 'verbose': {'color': 'blue'}, 'warning': {'color': 'yellow'}}
