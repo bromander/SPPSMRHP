@@ -23,14 +23,13 @@ import coloredlogs
 
 PENDING_REQUESTS = {}
 MESSAGE_IDS_ANM_REQUESTS = {}
-TOKEN = "7559789537:AAHvjxbEEmQ46w4ACdDoeJ2tQSlp3lZsolk"
+TOKEN = "7559789537:AAErm3K59YugEmqMy_yY27JaPpZr08aetRE"
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
 
 admins_ids = [
-    5389197909,
-    6785020418
+    5389197909
 ]
 
 
@@ -71,7 +70,6 @@ def catch_errors(func) -> any:
                                      f"<i>Данные пользователя небыли найдены!</i>\n\n"
                                      f"Попробуйте ввести /start\n"
                                      f"В случае повторной ошибки, обратитесь в техническую поддержку: @br0mand"), parse_mode="HTML")
-                return None
 
             tb = sys.exc_info()[2]
             last_trace = traceback.extract_tb(tb)[-1]
