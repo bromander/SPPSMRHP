@@ -3,6 +3,7 @@ from typing import Optional, Union
 from yandex_music.exceptions import NotFoundError
 import yandex_music
 from profanityfilter import ProfanityFilter
+import string
 
 pf = ProfanityFilter(languages=['ru', 'en'])
 
@@ -125,8 +126,11 @@ class Yandex_music_parse:
         with open("en_curse_words.txt", "r", encoding="UTF-8") as en_curse_words:
             ru_curse_words += en_curse_words.read().split("\n")
 
+        text = text.translate(str.maketrans('', '', string.punctuation))
+
         for i in ru_curse_words:
-            if i.upper() in text.upper():
+            if i.upper() in text.upper().split(' '):
+                print(i)
                 return True
         return False
 
