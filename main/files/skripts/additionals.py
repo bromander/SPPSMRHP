@@ -41,13 +41,28 @@ class Work_with_json:
         :return: Данные трека
         '''
         human_souls = dict(self.get_json_data("jsons/Human_souls.json"))
-        for i in human_souls.keys():
-            if track_name in list(human_souls[i]["suggested_music"].keys()):
+        for i in human_souls:
+            if track_name in human_souls[i]["suggested_music"]:
                 if human_souls[i]["suggested_music"][track_name] == None:
                     continue
                 else:
                     return human_souls[i]["suggested_music"][track_name]
         return "TrackNotFoundError"
+
+    def get_track_name(self, track_id: str, path="jsons/data.json") -> str:
+        return str(self.get_json_data(path)["tracks"][str(track_id)])
+
+    def get_track_id(self, track_name: str, path="jsons/data.json") -> str:
+        tracks = self.get_json_data(path)["tracks"]
+        for i in tracks:
+            if tracks[i] == track_name:
+                return i
+
+
+    def set_track_name(self, track_id: str, track_name: str, path="jsons/data.json") -> None:
+        tracks_names = dict(self.get_json_data(path))
+        tracks_names["tracks"][track_id] = track_name
+        self.send_json_data(tracks_names, path)
 
 
     def know_top20_music(self, class_pon: int) -> dict:
@@ -62,6 +77,7 @@ class Work_with_json:
             if human_souls[i]["class"] == class_pon:
                 for o in human_souls[i]["suggested_music"].keys():
                     if human_souls[i]["suggested_music"][o] == True:
+                        o = self.get_track_name(o)
                         if o not in top_dict.keys():
                             top_dict[o] = 1
                         else:
@@ -93,8 +109,7 @@ class Yandex_music_parse:
         Скачивает трек
         :param first_short: Данные трека
         '''
-        artists = "_".join([i["name"] for i in first_short['artists']][:3])
-        await first_short.download_async(f'./{first_short["title"]}-({artists}).mp3')
+        await first_short.download_async(f'./{first_short['id']}.mp3')
 
 
     async def check_mus_for_swearing(self, first_short: yandex_music.track.track.Track) -> Union[str, bool]:
@@ -130,21 +145,23 @@ class Yandex_music_parse:
 
         for i in ru_curse_words:
             if i.upper() in text.upper().split(' '):
-                print(i)
                 return True
         return False
 
 
-def suggest_music(state: Optional[bool], user_id: Union[int, str], track_name: str) -> None:
+def suggest_music(state: Optional[bool], user_id: Union[int, str], track_id: str, track_name = None) -> None:
     '''
     Записывает трек в данные игрока
     :param state: True - разрешён, False - Запрещён, None - ждёт разрешения администрации
     :param user_id: айди пользователя
-    :param track_name: название трека
+    :param track_id: название трека
     '''
     human_souls = Work_with_json().get_json_data("jsons/Human_souls.json")
-    human_souls[str(user_id)]["suggested_music"][track_name] = state
+    human_souls[str(user_id)]["suggested_music"][track_id] = state
     Work_with_json().send_json_data(human_souls, "jsons/Human_souls.json")
+
+    if track_name:
+        Work_with_json().set_track_name(track_id, track_name)
 
 if __name__ == "__main__":
     pass
