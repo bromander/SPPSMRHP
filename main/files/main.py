@@ -44,11 +44,6 @@ def block_filter() -> any:
         except KeyError:
             return True
 
-        if userdata["class"] == 0:
-            await message.answer("Ошибка, вы не ввели свой возраст!\nНапишите команду /start чтобы настроить свой профиль!")
-            return False
-
-
         if userdata["soul_name"] != "br0mand":
             return not userdata["blocked"]
         else:
@@ -64,14 +59,57 @@ def catch_errors(func) -> any:
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         try:
+            if str(type(args[0])) == '<class \'aiogram.types.message.Message\'>':
+                userdata = wwjson.get_json_data("jsons/Human_souls.json")[str(args[0].from_user.id)]
+                if userdata["class"] == 0:
+
+                    await start_command(args[0])
+                    return None
+
+
             return await func(*args, **kwargs)
         except Exception as e:
+
 
             tb = sys.exc_info()[2]
             last_trace = traceback.extract_tb(tb)[-1]
 
             if str(type(e).__name__) == "KeyError":
-                await start_command(args[0])
+                if str(type(args[0])) == '<class \'aiogram.types.message.Message\'>':
+                    await start_command(args[0])
+                elif str(type(args[0])) == '<class \'aiogram.types.callback_query.CallbackQuery\'>':
+                    await args[0].answer()
+
+                    human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
+
+                    if str(args[0].from_user.id) not in list(human_souls_data.keys()):
+                        human_souls_data[str(args[0].from_user.id)] = {
+                            "soul_name": args[0].from_user.username,
+                            "blocked": False,
+                            "suggested_music": {},
+                            "class": 0,
+                            "last_mus": 0
+                        }
+                        wwjson.send_json_data(human_souls_data, "jsons/Human_souls.json")
+
+                    if human_souls_data[str(args[0].from_user.id)]["class"] == 0:
+                        buttons = [
+                            [
+                                types.InlineKeyboardButton(text="5", callback_data="set_class_5"),
+                                types.InlineKeyboardButton(text="6", callback_data="set_class_6"),
+                                types.InlineKeyboardButton(text="7", callback_data="set_class_7"),
+                                types.InlineKeyboardButton(text="8", callback_data="set_class_8"),
+                                types.InlineKeyboardButton(text="9", callback_data="set_class_9"),
+                                types.InlineKeyboardButton(text="10", callback_data="set_class_10"),
+                                types.InlineKeyboardButton(text="11", callback_data="set_class_11")
+                            ]
+                        ]
+
+                        keyboard_pon = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+
+                        await args[0].message.answer("Здравствуйте!\nВыберите ваш класс (это можно сделать единожды):",
+                                             reply_markup=keyboard_pon)
+
                 return None
 
             logging.error(f'{type(e).__name__} on line {last_trace.lineno}: {e}')
@@ -83,16 +121,24 @@ def catch_errors(func) -> any:
                 .replace("[", "\\[").replace("`", "\\`")
 
             text = f"```python\n{escaped}```"
-            await args[0].answer((f"❗ Упс! Произошла неизвестная ошибка.\n"
-                                  f"Попробуйте выполнить команду /start или проверьте своё интернет‑соединение.\n"
-                                  f"Если это не поможет, обратитесь в техническую поддержку: @br0mand\n\n"
-                                  f"⚙️ Код ошибки:"))
-            await args[0].answer(text, parse_mode="MarkdownV2")
+            if str(type(args[0])) == '<class \'aiogram.types.callback_query.CallbackQuery\'>':
+                await args[0].message.answer((f"❗ Упс! Произошла неизвестная ошибка.\n"
+                                      f"Попробуйте выполнить команду /start или проверьте своё интернет‑соединение.\n"
+                                      f"Если это не поможет, обратитесь в техническую поддержку: @br0mand\n\n"
+                                      f"⚙️ Код ошибки:"))
+                await args[0].message.answer(text, parse_mode="MarkdownV2")
+            else:
+                await args[0].answer((f"❗ Упс! Произошла неизвестная ошибка.\n"
+                                      f"Попробуйте выполнить команду /start или проверьте своё интернет‑соединение.\n"
+                                      f"Если это не поможет, обратитесь в техническую поддержку: @br0mand\n\n"
+                                      f"⚙️ Код ошибки:"))
+                await args[0].answer(text, parse_mode="MarkdownV2")
 
 
     return wrapper
 
 @dp.message(Command("get_all_users"))
+@catch_errors
 async def get_all_users(message: Message) -> None:
     if int(message.from_user.id) in admins_ids:
         usersdata = wwjson.get_json_data("jsons/Human_souls.json")
@@ -119,6 +165,7 @@ async def get_all_users(message: Message) -> None:
 
 
 @dp.message(Command("set_recruiting"))
+@catch_errors
 async def set_recruiting(message: Message) -> None:
     if int(message.from_user.id) in admins_ids:
         data = wwjson.get_json_data('./jsons/data.json')
@@ -221,6 +268,7 @@ async def start_command(message: Message) -> None:
 
 
 @dp.callback_query(lambda c: c.data.startswith("set_class_"))
+@catch_errors
 async def set_class_(callback_query: types.CallbackQuery) -> None:
     '''
     Устанавливает класс в котором учится пользователь
@@ -264,7 +312,7 @@ async def music(message: Message, state: FSMContext) -> None:
 
     userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
-    if time.time() - int(userdata[str(message.from_user.id)]["last_mus"]) > 30:
+    if time.time() - int(userdata[str(message.from_user.id)]["last_mus"]) > 30 and int(message.from_user.id) in admins_ids:
         await message.answer("Введите название вашего трека/треков через запятую:")
         await state.set_state(Waiting.waiting_for_music)
         userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
@@ -320,7 +368,7 @@ async def waiting_for_music(message: Message, state: FSMContext) -> None:
                             logging.info(f'❔ Пользователь {message.from_user.username} предложил \"{i}\" трек, но его текст не был найден!')
                             states_pon.append(f"❔ Текст трека \"{i}\" (Распознанный как \"{visual_name}\") не был найден!\n")
                             additionals.suggest_music(None, message.from_user.id, f"{track['id']}", visual_name)
-                            asyncio.create_task(send_request_to_admins(message.from_user.username, track, message.from_user.id, i))
+                            asyncio.create_task(send_request_to_admins(message.from_user.username, track, message.from_user.id, i, str(message.from_user.id)))
 
                         elif not track_form:
                             logging.info(f'❌ Пользователь {message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
@@ -365,7 +413,7 @@ async def waiting_for_music(message: Message, state: FSMContext) -> None:
     await state.clear()
 
 
-async def send_request_to_admins(soul_name: str, track: yandex_music.track.track.Track, soul_id: int, soul_request: str) -> None:
+async def send_request_to_admins(soul_name: str, track: yandex_music.track.track.Track, soul_id: int, soul_request: str, senter_id: str) -> None:
     '''
     в случае, если текст трека не был найден, то отправляет администраторам запрос, разрешить/запретить трек или вообще заблокировать пользователя
     :param soul_name: Юзернейм пользователя
@@ -379,13 +427,15 @@ async def send_request_to_admins(soul_name: str, track: yandex_music.track.track
 
     track_pon = await yparse.parse(f"{track['title']}")
 
+    human_soul = dict(wwjson.get_json_data("jsons/Human_souls.json"))[str(soul_id)]
+
 
     await yparse.download_mus(track_pon)
 
     buttons = [
         [
-            types.InlineKeyboardButton(text="✅", callback_data=f"track_{track['id']}_allow"),
-            types.InlineKeyboardButton(text="❌", callback_data=f"track_{track['id']}_forbid")
+            types.InlineKeyboardButton(text="✅", callback_data=f"track_{track['id']}_{senter_id}_allow"),
+            types.InlineKeyboardButton(text="❌", callback_data=f"track_{track['id']}_{senter_id}_forbid")
         ],
         [
             types.InlineKeyboardButton(text=f"⛔ Заблокировать @{soul_name}", callback_data=f"block_user_{soul_id}")
@@ -398,7 +448,7 @@ async def send_request_to_admins(soul_name: str, track: yandex_music.track.track
     for e, i in enumerate(admins_ids):
         await bot.send_audio(i,
                 audio=audio_file,
-                caption=f"Душа @{soul_name} предлагает трек \"{track['title']}-({artists})\"\n(по запросу: {soul_request})",
+                caption=f"Душа @{soul_name} из {human_soul['class']} класса, предлагает трек \"{track['title']}-({artists})\"\n(по запросу: {soul_request})",
                 reply_markup=keyboard_pon)
 
 
@@ -406,30 +456,31 @@ async def send_request_to_admins(soul_name: str, track: yandex_music.track.track
 
 
 @dp.callback_query(lambda c: c.data.startswith("track_"))
+@catch_errors
 async def track_allow(callback_query: types.CallbackQuery) -> None:
     '''
     Обрабатывает разрешение/запрет трека от администрации
     '''
-
     track_title = callback_query.data.split("_")[1]
-    action = callback_query.data.split("_")[2]
+    senter_id = callback_query.data.split("_")[2]
+    action = callback_query.data.split("_")[3]
     visual_name = wwjson().get_track_name(track_title)
 
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
-    if human_souls[str(callback_query.from_user.id)]["suggested_music"][track_title] != None:
+    if human_souls[senter_id]["suggested_music"][track_title] != None:
         await callback_query.message.answer('Данный трек уже был оценён!')
         await callback_query.answer()
         return None
 
     if action == "allow":
-        human_souls[str(callback_query.from_user.id)]["suggested_music"][track_title] = True
+        human_souls[senter_id]["suggested_music"][track_title] = True
         for i in admins_ids:
             logging.info(f"✅ Трек {visual_name} был успешно одобрен админом @{callback_query.from_user.username}!")
             await bot.send_message(i, f"✅ Трек {visual_name} был успешно одобрен админом @{callback_query.from_user.username}!")
 
     elif action == "forbid":
-        human_souls[str(callback_query.from_user.id)]["suggested_music"][track_title] = False
+        human_souls[senter_id]["suggested_music"][track_title] = False
         for i in admins_ids:
             logging.info(f"❌ Трек {visual_name} был успешно отменён админом @{callback_query.from_user.username}!")
             await bot.send_message(i, f"❌ Трек {visual_name} был успешно отменён админом @{callback_query.from_user.username}!")
