@@ -7,7 +7,30 @@ import string
 
 pf = ProfanityFilter(languages=['ru', 'en'])
 
+
+
+
 class Work_with_json:
+
+    @staticmethod
+    def get_usertype(userid: str) -> str:
+        with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
+            file_data = json.load(file_data)
+        return file_data[str(userid)]["usertype"]
+
+    @staticmethod
+    def get_admins_list():
+        with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
+            file_data = json.load(file_data)
+        admins = [i for i in file_data if file_data[i]["usertype"] in ["admin", "super_admin"]]
+        return admins
+
+    @staticmethod
+    def is_user_admin(userid: str, what_type:list[str] = ["admin", "super_admin"]):
+        with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
+            file_data = json.load(file_data)
+        return file_data[str(userid)]["usertype"] in what_type
+
 
     @staticmethod
     def get_json_data(path:str, type_load:str="r", encoding:str="UTF-8") -> any:
@@ -87,7 +110,6 @@ class Work_with_json:
         return dict(list(top_dict.items())[:20])
 
 
-
 class Yandex_music_parse:
     def __init__(self, client):
         self.client = client
@@ -109,7 +131,7 @@ class Yandex_music_parse:
         Скачивает трек
         :param first_short: Данные трека
         '''
-        await first_short.download_async(f'./{first_short['id']}.mp3')
+        await first_short.download_async(f'./{first_short["id"]}.mp3')
 
 
     async def check_mus_for_swearing(self, first_short: yandex_music.track.track.Track) -> Union[str, bool]:
