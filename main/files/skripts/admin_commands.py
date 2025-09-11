@@ -1,48 +1,28 @@
 import asyncio
 import logging
-import traceback
-import sys
-import os
-from typing import Optional, Union
-import aiogram.exceptions
-import asyncio
-import logging
-import traceback
-import sys
-import os
-from typing import Optional, Union
-import aiogram.exceptions
-import yandex_music.exceptions
-from yandex_music import ClientAsync
 import time
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram import Bot, Dispatcher, types, Router
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message
 from skripts import additionals, admin_commands
 from skripts.additionals import Work_with_json as wwjson, Yandex_music_parse as Yparse
-from aiogram.fsm.context import FSMContext
-from git import Repo
-import functools
-import coloredlogs
+
 
 my_admins_router = Router(name=__name__)
 
 
 
-@my_admins_router.message(Command("clear_tracks"))
-async def add_admin(message: Message) -> None:
+@my_admins_router.message(Command("clear_usersdata"))
+async def clear_usersdata(message: Message) -> None:
     if wwjson.is_user_admin(str(message.from_user.id), ['super_admin']):
         usersdata = wwjson.get_json_data("jsons/Human_souls.json")
         for i in usersdata:
             usersdata[str(i)]["suggested_music"] = {}
+            usersdata[str(i)]["class"] = 0
         wwjson.send_json_data(usersdata, "jsons/Human_souls.json")
         for i in wwjson.get_admins_list():
-            await message.bot.send_message(i, f"🗑️ Пользователь @{message.from_user.username} отчистил данные всех треков пользователей!")
-        logging.warning(f"🗑️ Пользователь @{message.from_user.username} отчистил данные всех треков пользователей!")
+            await message.bot.send_message(i, f"🗑️ Пользователь @{message.from_user.username} отчистил данные всех пользователей (предложенные треки и классы)!")
+        logging.warning(f"🗑️ Пользователь @{message.from_user.username} отчистил данные всех пользователей(предложенные треки и классы)!")
     else:
         await message.answer("Ты как эту команду узнал?\nСори, но у тебя недостаточно прав на это")
 
@@ -118,15 +98,9 @@ async def get_all_users(message: Message) -> None:
             else:
                 user_last_activity = time.ctime(int(userdata["last_mus"]))
 
-            def is_user_blocked():
-                if userdata["usertype"] == 'blocked':
-                    return True
-                else:
-                    return False
-
             await message.answer(f'Пользователь @{userdata["soul_name"]}'
                                  f'\nID: <i>{i}</i>'
-                                 f'\nЗаблокирован: <i>{is_user_blocked()}</i>'
+                                 f'\nСтатус пользователя: <i>{userdata["usertype"]}</i>'
                                  f'\nКол-во  предложенных треков: <i>{len(userdata["suggested_music"])}</i>'
                                  f'\nПоследняя активность: <i>{user_last_activity}</i>'
                                  f'\nКласс: <i>{userdata["class"]}</i>')
@@ -142,12 +116,12 @@ async def set_recruiting(message: Message) -> None:
             data["recruiting"] = False
             for i in wwjson.get_admins_list():
                 await message.bot.send_message(chat_id=i, text="🔒 Набор треков был закрыт!")
-                logging.warning(f"🔒 Набор треков был закрыт пользователем {message.from_user.username}!")
+            logging.warning(f"🔒 Набор треков был закрыт пользователем {message.from_user.username}!")
         else:
             data["recruiting"] = True
             for i in wwjson.get_admins_list():
                 await message.bot.send_message(chat_id=i, text="🔓 Набор треков был открыт!")
-                logging.warning(f"🔓 Набор треков был открыт пользователем {message.from_user.username}!")
+            logging.warning(f"🔓 Набор треков был открыт пользователем {message.from_user.username}!")
         wwjson.send_json_data(data, './jsons/data.json')
     else:
         await message.answer("Ты как эту команду узнал?\nСори, но у тебя недостаточно прав на это")

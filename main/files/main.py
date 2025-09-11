@@ -3,7 +3,7 @@ import logging
 import traceback
 import sys
 import os
-from typing import Optional, Union
+from typing import Optional, Union, Any, Coroutine
 import aiogram.exceptions
 import yandex_music.exceptions
 from yandex_music import ClientAsync
@@ -40,7 +40,7 @@ def get_commands_for_user(user_type):
     elif user_type == 'super_admin':
         _text = ("Команды бота:\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
                 "\n\nКоманды админа:\n/get_all_users - получить все данные пользователей"
-                 "\n\nКоманды супер-админа:\n/set_recruiting - вкл/выкл набор пользователей\n/add_admin (ID пользователя) - добавить нового админа\n/del_admin (ID пользователя) - удалить админа из состава")
+                 "\n\nКоманды супер-админа:\n/set_recruiting - вкл/выкл набор пользователей\n/add_admin (ID пользователя) - добавить нового админа\n/del_admin (ID пользователя) - удалить админа из состава\n/clear_usersdata - отчистить данные пользователей (классы и треки)")
     else:
         _text = ' '
     return _text
@@ -51,10 +51,10 @@ class decorators:
 
     @staticmethod
     def block_filter() -> any:
-        '''
+        """
         хендлер, проверяющий, не заблокирован ли пользователь
-        '''
-        async def _filter(message: Message) -> bool:
+        """
+        async def _filter(message: Message) -> Optional[bool]:
             try:
                 userdata = wwjson.get_json_data("jsons/Human_souls.json")[str(message.from_user.id)]
             except KeyError:
@@ -70,9 +70,9 @@ class decorators:
 
     @staticmethod
     def catch_errors(func) -> any:
-        '''
+        """
         Хендлер, который в случае, если в коде при взаимодействии с пользователем происходит ошибка, сообщает об этом
-        '''
+        """
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             try:
@@ -193,10 +193,10 @@ async def send_info(message: Message) -> None:
 #Комманда Start
 @dp.message(Command("start"))
 async def start_command(message: Message) -> None:
-    '''
+    """
     Команда, вызываемая при первом взаимодействии пользователя с ботом.
     Сохраняет его в базу данных и требует некоторую информацию
-    '''
+    """
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     if str(message.from_user.id) not in list(human_souls_data.keys()):
@@ -233,9 +233,9 @@ async def start_command(message: Message) -> None:
 @dp.callback_query(lambda c: c.data.startswith("set_class_"))
 @decorators.catch_errors
 async def set_class_(callback_query: types.CallbackQuery) -> None:
-    '''
+    """
     Устанавливает класс в котором учится пользователь
-    '''
+    """
 
     class_pon = str(callback_query.data).split("_")[2]
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
@@ -247,7 +247,7 @@ async def set_class_(callback_query: types.CallbackQuery) -> None:
 
 
     await callback_query.answer()
-    logging.warning(f"Новый пользователь {callback_query.from_user.username} из {class_pon} класса!")
+    logging.warning(f"Новый пользователь @{callback_query.from_user.username} из {class_pon} класса!")
 
 class Waiting(StatesGroup):
     waiting_for_music = State()
@@ -256,10 +256,10 @@ class Waiting(StatesGroup):
 @dp.message(decorators.block_filter(), Command("music"))
 @decorators.catch_errors
 async def music(message: Message, state: FSMContext) -> None:
-    '''
+    """
     Запрашивает у пользователя музыку
     Команда: /music
-    '''
+    """
     data = wwjson.get_json_data('./jsons/data.json')
 
     if not data["recruiting"]:
@@ -282,10 +282,10 @@ async def music(message: Message, state: FSMContext) -> None:
 @dp.message(Waiting.waiting_for_music)
 @decorators.catch_errors
 async def waiting_for_music(message: Message, state: FSMContext) -> None:
-    '''
+    """
     Получает список музыки от пользователя, парсит его и проверяет текст на неприличные выражения.
     В случае, если текст трека не был найден, то отправляет сообщение администраторам, чтобы те его проверили и разрешили/отклонили
-    '''
+    """
     states_pon = []
     musics = message.text.split(",")
     if len(musics) >= 50:
@@ -303,7 +303,7 @@ async def waiting_for_music(message: Message, state: FSMContext) -> None:
                 track = await yparse.parse(i)
 
             except AttributeError:
-                logging.warning(f'⛔ Пользователь {message.from_user.username} предложил \"{i}\" трек, но трек не был найден!')
+                logging.warning(f'⛔ Пользователь @{message.from_user.username} предложил \"{i}\" трек, но трек не был найден!')
                 states_pon.append(f"⛔ Трек \"{i}\" не был найден!\n")
 
             else:
@@ -320,47 +320,46 @@ async def waiting_for_music(message: Message, state: FSMContext) -> None:
                         track_form = wwjson().already_have_that_track(str(track['id']))
 
                         if track_form == "TrackNotFoundError":
-                            logging.warning(f'❔ Пользователь {message.from_user.username} предложил \"{i}\" трек, но его текст не был найден!')
+                            logging.warning(f'❔ Пользователь @{message.from_user.username} предложил \"{i}\" трек, но его текст не был найден!')
                             states_pon.append(f"❔ Текст трека \"{i}\" (Распознанный как \"{visual_name}\") не был найден!\n")
                             additionals.suggest_music(None, message.from_user.id, f"{track['id']}", visual_name)
                             asyncio.create_task(send_request_to_admins(message.from_user.username, track, message.from_user.id, i, str(message.from_user.id)))
 
                         elif not track_form:
-                            logging.warning(f'❌ Пользователь {message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
+                            logging.warning(f'❌ Пользователь @{message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
                             states_pon.append(f"❌ В треке \"{i}\" (Распознанный как \"{visual_name}\") была найдена ненормативная лексика!\n")
                             additionals.suggest_music(False, message.from_user.id, f"{track['id']}", visual_name)
 
                         elif track_form:
-                            logging.warning(f'✅ Пользователь {message.from_user.username} предложил \"{i}\" трек и он был добавлен!')
+                            logging.warning(f'✅ Пользователь @{message.from_user.username} предложил \"{i}\" трек и он был добавлен!')
                             states_pon.append(f"✅ Трек \"{i}\" (Распознанный как \"{visual_name}\") добавлен в список возможной музыки!\n")
                             additionals.suggest_music(True, message.from_user.id, f"{track['id']}", visual_name)
 
 
                     elif track_swearing:
-                        logging.warning(f'❌ Пользователь {message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
+                        logging.warning(f'❌ Пользователь @{message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
                         states_pon.append(f"❌ В треке \"{i}\" (Распознанный как \"{visual_name}\") была найдена ненормативная лексика!\n")
                         additionals.suggest_music(False, message.from_user.id, f"{track['id']}", visual_name)
                     else:
-                        logging.warning(f'✅ Пользователь {message.from_user.username} предложил \"{i}\" трек и он был добавлен!')
+                        logging.warning(f'✅ Пользователь @{message.from_user.username} предложил \"{i}\" трек и он был добавлен!')
                         states_pon.append(f"✅ Трек \"{i}\" (Распознанный как \"{visual_name}\") добавлен в список возможной музыки!\n")
                         additionals.suggest_music(True, message.from_user.id, f"{track['id']}", visual_name)
 
 
                 else:
-                    logging.warning(f'❌ Пользователь {message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
+                    logging.warning(f'❌ Пользователь @{message.from_user.username} предложил \"{i}\" трек с ненормативной лексикой!')
                     states_pon.append(f"❌ В названии трека \"{i}\" была найдена ненормативная лексика!\n")
 
         else:
-            logging.warning(f'❌ Пользователь {message.from_user.username} предложил \"{i}\" название трека с ненормативной лексикой!')
+            logging.warning(f'❌ Пользователь @{message.from_user.username} предложил \"{i}\" название трека с ненормативной лексикой!')
             states_pon.append(f"❌ В названии трека \"{i}\" была найдена ненормативная лексика!\n")
 
         query = '\n'.join(states_pon)
         await message_query.edit_text(f"Парсинг треков...\n<blockquote expandable>{query}</blockquote>")
 
     await message_query.edit_text(f"Треки были проверены!\n<blockquote expandable>{query}</blockquote>"
-                                  f"\n🔹Предложенные вами треки можно удалить в профиле /profile"
+                                  f"\n🔹Предложенные вами треки и их состояния можно удалить в профиле /profile"
                                   f"\n🔹Если текст трека не был найден, наш администратор проверит его в течении 48 часов."
-                                  f"\n🔹Состояние ваших треков можно увидеть в профиле /profile"
                                   f"\n🔹Если трек не был найден вообще, попробуйте указать автора, убедитесь в правильности запроса или проверьте, доступен ли этот трек на Яндекс Музыке.")
     userdata = dict(wwjson.get_json_data("jsons/Human_souls.json"))
     userdata[str(message.from_user.id)]["last_mus"] = int(time.time())
@@ -369,13 +368,13 @@ async def waiting_for_music(message: Message, state: FSMContext) -> None:
 
 
 async def send_request_to_admins(soul_name: str, track: yandex_music.track.track.Track, soul_id: int, soul_request: str, senter_id: str) -> None:
-    '''
+    """
     в случае, если текст трека не был найден, то отправляет администраторам запрос, разрешить/запретить трек или вообще заблокировать пользователя
     :param soul_name: Юзернейм пользователя
     :param track: Информация трека
     :param soul_id: Айди пользователя
     :param soul_request: То, что ввёл пользователь, чтобы найти трек
-    '''
+    """
     soul_request = soul_request.replace("\n", '')
 
     artists = ', '.join([i['name'] for i in track['artists']][:3])
@@ -413,9 +412,9 @@ async def send_request_to_admins(soul_name: str, track: yandex_music.track.track
 @dp.callback_query(lambda c: c.data.startswith("track_"))
 @decorators.catch_errors
 async def track_allow(callback_query: types.CallbackQuery) -> None:
-    '''
+    """
     Обрабатывает разрешение/запрет трека от администрации
-    '''
+    """
     track_title = callback_query.data.split("_")[1]
     senter_id = callback_query.data.split("_")[2]
     action = callback_query.data.split("_")[3]
@@ -423,7 +422,7 @@ async def track_allow(callback_query: types.CallbackQuery) -> None:
 
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
-    if human_souls[senter_id]["suggested_music"][track_title] != None:
+    if human_souls[senter_id]["suggested_music"][track_title] is not None:
         await callback_query.message.answer('Данный трек уже был оценён!')
         await callback_query.answer()
         return None
@@ -446,15 +445,17 @@ async def track_allow(callback_query: types.CallbackQuery) -> None:
 
 @dp.callback_query(lambda c: c.data.startswith("block_user_"))
 async def block_user(callback_query: types.CallbackQuery) -> None:
-    '''
+    """
     Блокирует пользователя
-    '''
+    """
     userid = callback_query.data.split("_")[2]
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
+    username = userid
     for i in human_souls:
         if i == userid:
             username = human_souls[i]["soul_name"]
             break
+
     human_souls[str(userid)]["usertype"] = "blocked"
     wwjson.send_json_data(human_souls, "jsons/Human_souls.json")
     for i in wwjson.get_admins_list():
@@ -466,24 +467,24 @@ async def block_user(callback_query: types.CallbackQuery) -> None:
 @dp.message(decorators.block_filter(), Command("profile"))
 @decorators.catch_errors
 async def profile(message: Message) -> None:
-    '''
+    """
     Выводит данные человека самому себе
     Команда: /profile
-    '''
+    """
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     all_user_tracks = []
     for e, i in enumerate(human_souls[str(message.from_user.id)]["suggested_music"].keys()):
-        if human_souls[str(message.from_user.id)]["suggested_music"][i] == False:
-            icon = "❌"
-        elif human_souls[str(message.from_user.id)]["suggested_music"][i] == True:
-            icon = "✅"
-        elif human_souls[str(message.from_user.id)]["suggested_music"][i] == None:
+        if human_souls[str(message.from_user.id)]["suggested_music"][i] is None:
             icon = "❔"
+        elif human_souls[str(message.from_user.id)]["suggested_music"][i]:
+            icon = "✅"
+        elif not human_souls[str(message.from_user.id)]["suggested_music"][i]:
+            icon = "❌"
         i = wwjson().get_track_name(i)
         all_user_tracks.append(f"{e+1}. {i}   -   {icon}")
 
-    all_user_tracks = "\n\n".join(all_user_tracks)
+    all_user_tracks = "\n".join(all_user_tracks)
 
     user_class = human_souls[str(message.from_user.id)]["class"]
     tracks_len = len(list(human_souls[str(message.from_user.id)]["suggested_music"].keys()))
@@ -504,9 +505,9 @@ class Delete_track(StatesGroup):
 
 @dp.callback_query(lambda c: c.data == "choose_delete_track")
 async def delete_track(callback_query: types.CallbackQuery, state: FSMContext) -> None:
-    '''
+    """
     Спрашивает у пользователя, какой трек удалить
-    '''
+    """
     builder = ReplyKeyboardBuilder()
 
     human_souls_data = dict(wwjson.get_json_data("jsons/Human_souls.json"))
@@ -522,21 +523,21 @@ async def delete_track(callback_query: types.CallbackQuery, state: FSMContext) -
             "Выберите трек:",
             reply_markup=builder.as_markup(resize_keyboard=True),
         )
+        await state.set_state(Delete_track.waiting_name)
     else:
         await callback_query.message.answer("❗ Вы не предложили ни одного трека!")
         return None
     await callback_query.answer()
-    await state.set_state(Delete_track.waiting_name)
 
 
 @dp.message(Delete_track.waiting_name)
-async def set_class_(message: Message, state: FSMContext) -> None:
-    '''
+async def delete_track_(message: Message, state: FSMContext) -> None:
+    """
     Удаляет трек
-    '''
+    """
     track = wwjson().get_track_id(message.text)
     track_name = message.text
-    if track == 'Отменить':
+    if track_name == 'Отменить':
         mess = await message.answer(f"Отмена...", reply_markup=aiogram.types.ReplyKeyboardRemove())
         await state.clear()
         await mess.delete()
@@ -561,9 +562,9 @@ async def set_class_(message: Message, state: FSMContext) -> None:
 @dp.message(decorators.block_filter(), Command("top"))
 @decorators.catch_errors
 async def top(message: Message) -> None:
-    '''
+    """
     Выводит топ треков
-    '''
+    """
     human_souls = dict(wwjson.get_json_data("jsons/Human_souls.json"))
 
     TOP_20_SOUNDS_DONT_LOOSE_IT_OMG_OMG_OMG_WHAT_TO_HELL_OH_MY_GOT_IS_THAT_REALLY_7777_1488_pon_pon_pon_pon_pon = (
@@ -617,7 +618,6 @@ async def main() -> None:
         else:
             if not connect_stat:
                 logging.warning("Connection is established!")
-                connect_stat = True
                 client = await ClientAsync(token="y0__xD7ganyBRje-AYgicPntBL0uWtUHnAsJBHTkC-I29OiaSJPeg").init()
                 yparse = Yparse(client)
             break

@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Optional, Union
 from yandex_music.exceptions import NotFoundError
 import yandex_music
@@ -14,19 +15,32 @@ class Work_with_json:
 
     @staticmethod
     def get_usertype(userid: str) -> str:
+        """
+        :param userid: айди пользователя
+        :return: тип пользователя
+        """
         with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
             file_data = json.load(file_data)
         return file_data[str(userid)]["usertype"]
 
     @staticmethod
-    def get_admins_list():
+    def get_admins_list() -> list[str]:
+        """
+        :return: список айди всех администраторов
+        """
         with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
             file_data = json.load(file_data)
         admins = [i for i in file_data if file_data[i]["usertype"] in ["admin", "super_admin"]]
         return admins
 
     @staticmethod
-    def is_user_admin(userid: str, what_type:list[str] = ["admin", "super_admin"]):
+    def is_user_admin(userid: str, what_type:list[str] = ["admin", "super_admin"]) -> bool:
+        """
+        Проверяет свляется ли пользователь администратором
+        :param userid: Айди пользователя
+        :param what_type: список проверяемых типов пользователя
+        :return: True - тип пользователя в списке, False - тип пользователя не соответствует
+        """
         with open("jsons/Human_souls.json", "r", encoding="UTF-8") as file_data:
             file_data = json.load(file_data)
         return file_data[str(userid)]["usertype"] in what_type
@@ -34,13 +48,13 @@ class Work_with_json:
 
     @staticmethod
     def get_json_data(path:str, type_load:str="r", encoding:str="UTF-8") -> any:
-        '''
+        """
         Выдаёт данные json файла
         :param path: Путь к файлу
         :param type_load: тип загрузки
         :param encoding: кодирование
         :return: данные файла
-        '''
+        """
         with open(path, type_load, encoding=encoding) as file_data:
             return json.load(file_data)
 
@@ -58,11 +72,11 @@ class Work_with_json:
 
 
     def already_have_that_track(self, track_name: str):
-        '''
+        """
         Проверяет, есть ли уже такой трек
         :param track_name: Название трека
         :return: Данные трека
-        '''
+        """
         human_souls = dict(self.get_json_data("jsons/Human_souls.json"))
         for i in human_souls:
             if track_name in human_souls[i]["suggested_music"]:
@@ -81,7 +95,6 @@ class Work_with_json:
             if tracks[i] == track_name:
                 return i
 
-
     def set_track_name(self, track_id: str, track_name: str, path="jsons/data.json") -> None:
         tracks_names = dict(self.get_json_data(path))
         tracks_names["tracks"][track_id] = track_name
@@ -89,17 +102,17 @@ class Work_with_json:
 
 
     def know_top20_music(self, class_pon: int) -> dict:
-        '''
+        """
         Выдаёт топ 20 треков, сортируя их по количеству
         :param class_pon: шкильный класс
         :return: 20 самых популярити треков
-        '''
+        """
         top_dict = {}
         human_souls = dict(self.get_json_data("jsons/Human_souls.json"))
         for i in human_souls.keys():
             if human_souls[i]["class"] == class_pon:
                 for o in human_souls[i]["suggested_music"].keys():
-                    if human_souls[i]["suggested_music"][o] == True:
+                    if human_souls[i]["suggested_music"][o]:
                         o = self.get_track_name(o)
                         if o not in top_dict.keys():
                             top_dict[o] = 1
@@ -115,11 +128,11 @@ class Yandex_music_parse:
         self.client = client
 
     async def parse(self, query: str) -> dict:
-        '''
+        """
         Парсит трек на яндекс музыке
         :param query: название трека
         :return: словарь с данными самого подходящего трека
-        '''
+        """
         search_res = await self.client.search(query, type_='track')
         first_short = search_res.tracks.results[0]
 
@@ -127,18 +140,18 @@ class Yandex_music_parse:
 
     @staticmethod
     async def download_mus(first_short: yandex_music.track.track.Track) -> None:
-        '''
+        """
         Скачивает трек
         :param first_short: Данные трека
-        '''
+        """
         await first_short.download_async(f'./{first_short["id"]}.mp3')
 
 
     async def check_mus_for_swearing(self, first_short: yandex_music.track.track.Track) -> Union[str, bool]:
-        '''
+        """
         Проверяет трек на наличие нецензурных выражений
         :return: bool/Exception/"NotFoundError"
-        '''
+        """
         try:
             lyrics_info = await first_short.get_lyrics_async()
             text = await lyrics_info.fetch_lyrics_async()
@@ -149,24 +162,24 @@ class Yandex_music_parse:
             raise e
 
     @staticmethod
-    # true - есть мат, false - нет мата
     async def check_text_for_swearing(text: str) -> bool:
-        '''
+        """
         Проверяет текст на наличие нецензурных выражений
         :param text: Текст
-        :return: True/False
-        '''
+        :return: True - есть мат, False - нет мата
+        """
         with open("ru_curse_words.txt", "r", encoding="UTF-8") as ru_curse_words:
-            ru_curse_words = ru_curse_words.read().split("\n")
+            curse_words = ru_curse_words.read().split("\n")
         with open("ru_abusive_words.txt", "r", encoding="UTF-8") as ru_abusive_words:
-            ru_curse_words += ru_abusive_words.read().split("\n")
-        with open("en_curse_words.txt", "r", encoding="UTF-8") as en_curse_words:
-            ru_curse_words += en_curse_words.read().split("\n")
+            curse_words += ru_abusive_words.read().split("\n")
+        with open("en_curse_words.json", "r", encoding="UTF-8") as en_curse_words:
+            curse_words += json.load(en_curse_words)
 
         text = text.translate(str.maketrans('', '', string.punctuation))
 
-        for i in ru_curse_words:
+        for i in curse_words:
             if i.upper() in text.upper().split(' '):
+                logging.warn(f"Нецензурное слово: {i}")
                 return True
         return False
 
