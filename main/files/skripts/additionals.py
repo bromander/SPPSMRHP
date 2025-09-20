@@ -5,10 +5,16 @@ from yandex_music.exceptions import NotFoundError
 import yandex_music
 from profanityfilter import ProfanityFilter
 import string
+from collections import Counter
 
 pf = ProfanityFilter(languages=['ru', 'en'])
 
-
+with open("ru_curse_words.txt", "r", encoding="UTF-8") as ru_CURSEWORDS:
+    CURSEWORDS = ru_CURSEWORDS.read().split("\n")
+with open("ru_abusive_words.txt", "r", encoding="UTF-8") as ru_CURSEWORDS:
+    CURSEWORDS += ru_CURSEWORDS.read().split("\n")
+with open("en_curse_words.json", "r", encoding="UTF-8") as en_CURSEWORDS:
+    CURSEWORDS += json.load(en_CURSEWORDS)
 
 
 class Work_with_json:
@@ -77,17 +83,20 @@ class Work_with_json:
         :param track_name: Название трека
         :return: Данные трека
         """
-        human_souls = dict(self.get_json_data("jsons/Human_souls.json"))
-        for i in human_souls:
-            if track_name in human_souls[i]["suggested_music"]:
-                if human_souls[i]["suggested_music"][track_name] == None:
-                    continue
-                else:
-                    return human_souls[i]["suggested_music"][track_name]
+        human_souls = self.get_json_data("jsons/Human_souls.json")
+
+        for soul in human_souls.values():
+            music = soul["suggested_music"].get(track_name)
+            if music is not None:
+                return music
+
         return "TrackNotFoundError"
 
     def get_track_name(self, track_id: str, path="jsons/data.json") -> str:
-        return str(self.get_json_data(path)["tracks"][str(track_id)])
+        try:
+            return str(self.get_json_data(path)["tracks"][str(track_id)])
+        except KeyError:
+            return str(track_id)
 
     def get_track_id(self, track_name: str, path="jsons/data.json") -> str:
         tracks = self.get_json_data(path)["tracks"]
@@ -107,20 +116,17 @@ class Work_with_json:
         :param class_pon: шкильный класс
         :return: 20 самых популярити треков
         """
-        top_dict = {}
-        human_souls = dict(self.get_json_data("jsons/Human_souls.json"))
-        for i in human_souls.keys():
-            if human_souls[i]["class"] == class_pon:
-                for o in human_souls[i]["suggested_music"].keys():
-                    if human_souls[i]["suggested_music"][o]:
-                        o = self.get_track_name(o)
-                        if o not in top_dict.keys():
-                            top_dict[o] = 1
-                        else:
-                            top_dict[o] += 1
-        top_dict = dict(sorted(top_dict.items(), key=lambda item: item[1], reverse=True))
+        human_souls = self.get_json_data("jsons/Human_souls.json")
+        counter = Counter()
 
-        return dict(list(top_dict.items())[:20])
+        for soul in human_souls.values():
+            if soul["class"] == class_pon:
+                for track, music in soul["suggested_music"].items():
+                    if music:  # != None / пустому
+                        name = self.get_track_name(track)
+                        counter[name] += 1
+
+        return dict(counter.most_common(20))
 
 
 class Yandex_music_parse:
@@ -168,18 +174,13 @@ class Yandex_music_parse:
         :param text: Текст
         :return: True - есть мат, False - нет мата
         """
-        with open("ru_curse_words.txt", "r", encoding="UTF-8") as ru_curse_words:
-            curse_words = ru_curse_words.read().split("\n")
-        with open("ru_abusive_words.txt", "r", encoding="UTF-8") as ru_abusive_words:
-            curse_words += ru_abusive_words.read().split("\n")
-        with open("en_curse_words.json", "r", encoding="UTF-8") as en_curse_words:
-            curse_words += json.load(en_curse_words)
 
         text = text.translate(str.maketrans('', '', string.punctuation))
+        words = text.upper().split()
 
-        for i in curse_words:
-            if i.upper() in text.upper().split(' '):
-                logging.warn(f"Нецензурное слово: {i}")
+        for curse in CURSEWORDS:
+            if curse.upper() in words:
+                logging.warning(f"Нецензурное слово: {curse}")
                 return True
         return False
 

@@ -4,8 +4,10 @@ import traceback
 import sys
 import os
 from typing import Optional, Union, Any, Coroutine
+import io
 import aiogram.exceptions
 import yandex_music.exceptions
+from setuptools.command.build_py import make_writable
 from yandex_music import ClientAsync
 import time
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
@@ -25,24 +27,23 @@ import coloredlogs
 
 PENDING_REQUESTS = {}
 MESSAGE_IDS_ANM_REQUESTS = {}
-TOKEN = "7559789537:AAErm3K59YugEmqMy_yY27JaPpZr08aetRE"
+TOKEN = "7559789537:AAG4vFAdPsTkLNX4EksuT_hIZnK3F4XGD8s"
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp = Dispatcher()
 
 
 def get_commands_for_user(user_type):
-    if user_type == "default":
-        _text = "Команды бота:\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
-    elif user_type == 'admin':
-        _text = ("Команды бота:\n\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
-                 "\n\nКоманды админа:\n/get_all_users - получить все данные пользователей")
-    elif user_type == 'super_admin':
-        _text = ("Команды бота:\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
-                "\n\nКоманды админа:\n/get_all_users - получить все данные пользователей"
-                 "\n\nКоманды супер-админа:\n/set_recruiting - вкл/выкл набор пользователей\n/add_admin (ID пользователя) - добавить нового админа\n/del_admin (ID пользователя) - удалить админа из состава\n/clear_usersdata - отчистить данные пользователей (классы и треки)")
-    else:
-        _text = ' '
+    match user_type:
+        case 'admin':
+            _text = ("Команды бота:\n\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
+                     "\n\nКоманды админа:\n/get_all_users - получить все данные пользователей")
+        case 'super_admin':
+            _text = ("Команды бота:\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
+                    "\n\nКоманды админа:\n/get_all_users - получить все данные пользователей"
+                     "\n\nКоманды супер-админа:\n/set_recruiting - вкл/выкл набор пользователей\n/add_admin (ID пользователя) - добавить нового админа\n/del_admin (ID пользователя) - удалить админа из состава\n/clear_usersdata - отчистить данные пользователей (классы и треки)")
+        case _:
+            _text = "Команды бота:\n/music - предложить музыку\n/profile - Ваш профиль в боте\n/top - топ треков\n/bot_info - тех информация о боте"
     return _text
 
 
